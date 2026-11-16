@@ -1,0 +1,721 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>God Eye v4.0</title>
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
+<style>
+  :root {
+    --bg:#030712; --panel:#0b1220; --border:#1e293b; --text:#e2e8f0;
+    --muted:#64748b; --green:#22c55e; --red:#ef4444; --violet:#8b5cf6;
+    --cyan:#06b6d4; --yellow:#f59e0b;
+  }
+  [data-theme="light"] { --bg:#f8fafc; --panel:#fff; --border:#e2e8f0; --text:#0f172a; --muted:#64748b; }
+  * { box-sizing: border-box; transition: background .2s, color .2s, border-color .2s; }
+  html, body, #root { height: 100%; margin: 0; }
+  body {
+    background: radial-gradient(1200px 600px at 50% -20%, #1e1b4b 0%, var(--bg) 60%);
+    color: var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto;
+  }
+  [data-theme="light"] body { background: var(--bg); }
+  .god-title { font-size: 26px; font-weight: 800; letter-spacing: .5px;
+    background: linear-gradient(90deg,#a78bfa,#22d3ee,#22c55e);
+    -webkit-background-clip: text; color: transparent; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+  .stat-value { font-size: 28px; font-weight: 800; }
+  .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-weight: 600; font-size: 11px;
+    text-transform: uppercase; padding: 8px; border-bottom: 1px solid var(--border); }
+  td { padding: 8px; border-bottom: 1px solid var(--border); }
+  tr:hover td { background: rgba(139,92,246,.05); }
+  .field-hit { color: var(--green); font-weight: 600; }
+  .miss { color: var(--red); }
+  .btn { background: linear-gradient(135deg,#7c3aed,#06b6d4); border: none; color: white;
+    padding: 10px 16px; border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 600; }
+  .btn:hover { opacity: .9; transform: translateY(-1px); }
+  .btn:disabled { opacity: .5; cursor: wait; }
+  .btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn.ghost:hover { border-color: var(--violet); }
+  .pill { padding: 3px 9px; border-radius: 999px; font-size: 11px; border: 1px solid var(--border); }
+  input[type="text"], textarea, select {
+    background: var(--panel); color: var(--text); border: 1px solid var(--border);
+    border-radius: 10px; padding: 8px 12px; font-size: 13px; font-family: inherit;
+  }
+  input[type="text"]:focus, textarea:focus { outline: none; border-color: var(--violet); }
+  textarea { font-family: 'Fira Code', 'Courier New', monospace; resize: vertical; }
+  .pulse { animation: pulse 1s ease-out; }
+  @keyframes pulse { 0% { background: rgba(34,197,94,.35); } 100% { background: transparent; } }
+  .graph-node {
+    position: absolute; padding: 8px 12px; border-radius: 10px; font-size: 11px;
+    cursor: pointer; background: var(--panel); border: 2px solid #334155;
+    white-space: pre-line; text-align: center; user-select: none;
+    transition: transform .2s, box-shadow .2s, border-color .3s;
+  }
+  .graph-node:hover { transform: scale(1.08); z-index: 10; }
+  .graph-node.covered { border-color: var(--green); box-shadow: 0 0 10px rgba(34,197,94,.4); }
+  .graph-node.partial { border-color: var(--yellow); box-shadow: 0 0 8px rgba(245,158,11,.3); }
+  .graph-node.miss { border-color: #475569; opacity: .7; }
+  .graph-node.selected { background: rgba(139,92,246,.2); }
+  .graph-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+  .graph-container { position: relative; height: 580px; overflow: hidden; }
+  .heat-bar { height: 8px; border-radius: 4px; }
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.75);
+    display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); }
+  .modal { background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+    padding: 20px; max-width: 800px; width: 92%; max-height: 85vh; overflow: auto; }
+  .toast-container { position: fixed; bottom: 20px; right: 20px; display: flex;
+    flex-direction: column; gap: 8px; z-index: 200; }
+  .toast { background: var(--panel); border: 1px solid var(--green); color: var(--green);
+    padding: 12px 18px; border-radius: 10px; font-size: 13px; font-weight: 600;
+    animation: slideIn .3s ease-out; min-width: 220px; }
+  .toast.error { border-color: var(--red); color: var(--red); }
+  @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  .hot-item { display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .hot-item:last-child { border-bottom: none; }
+  .hot-rank { width: 20px; color: var(--muted); font-weight: 700; }
+  .hot-bar { flex: 1; height: 6px; background: var(--border); border-radius: 3px; margin: 0 8px; overflow: hidden; }
+  .hot-fill { height: 100%; background: linear-gradient(90deg,var(--cyan),var(--green)); border-radius: 3px; }
+  .legend { display: flex; gap: 12px; font-size: 11px; color: var(--muted); align-items: center; }
+  .legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; }
+  .filter-btn { background: transparent; border: 1px solid var(--border); color: var(--muted);
+    padding: 5px 10px; border-radius: 8px; font-size: 12px; cursor: pointer; }
+  .filter-btn.active { background: var(--violet); color: white; border-color: var(--violet); }
+  .timeline-bar { display: flex; align-items: flex-end; gap: 4px; height: 80px; padding: 8px 0; }
+  .timeline-bar-item { flex: 1; background: linear-gradient(180deg,var(--green),var(--cyan));
+    border-radius: 3px 3px 0 0; min-height: 4px; cursor: pointer; position: relative; transition: opacity .2s; }
+  .timeline-bar-item:hover { opacity: .8; }
+  .timeline-bar-item.active { outline: 2px solid var(--yellow); }
+  .onboarding { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--panel); border: 2px solid var(--violet); border-radius: 14px;
+    padding: 16px 24px; font-size: 14px; z-index: 150; box-shadow: 0 8px 32px rgba(139,92,246,.4);
+    animation: bounceIn .4s ease-out; }
+  @keyframes bounceIn { from { transform: translate(-50%, 100px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+const API = "";
+async function api(path, opts) {
+  const r = await fetch(API + path, opts);
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  return r.json();
+}
+
+// ---- Toast system ----
+function useToasts() {
+  const [toasts, setToasts] = useState([]);
+  const add = (msg, isError = false) => {
+    const id = Date.now() + Math.random();
+    setToasts(t => [...t, { id, msg, isError }]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3000);
+  };
+  return { toasts, add };
+}
+function Toasts({ toasts }) {
+  return (
+    <div className="toast-container">
+      {toasts.map(t => (
+        <div key={t.id} className={`toast ${t.isError ? "error" : ""}`}>
+          {t.isError ? "✕" : "✓"} {t.msg}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ---- Card ----
+function Card({ label, value, color }) {
+  return (
+    <div className="panel" style={{ minWidth: 130, flex: 1 }}>
+      <div className="stat-label">{label}</div>
+      <div className="stat-value" style={{ color }}>{value}</div>
+    </div>
+  );
+}
+
+// ---- Legend ----
+function Legend() {
+  return (
+    <div className="legend">
+      <span><span className="legend-dot" style={{ background: "#22c55e" }} />покрыт</span>
+      <span><span className="legend-dot" style={{ background: "#f59e0b" }} />частично</span>
+      <span><span className="legend-dot" style={{ background: "#475569" }} />не покрыт</span>
+    </div>
+  );
+}
+
+// ---- Schema Graph (получает всё через props — единый источник правды) ----
+function SchemaGraph({ graph, fieldMap, onSelectField }) {
+  const [selected, setSelected] = useState(null);
+
+  const layout = useMemo(() => {
+    if (!graph) return { nodes: [], edges: [] };
+    const names = Object.keys(graph.types);
+    const cx = 420, cy = 290, R = 230;
+    const nodes = names.map((name, i) => {
+      const baseAngle = (i / names.length) * Math.PI * 2 - Math.PI / 2;
+      const angle = baseAngle;
+      const fields = Object.keys(graph.types[name].fields);
+      const covered = fields.filter(f => (fieldMap[`${name}.${f}`]?.hits || 0) > 0).length;
+      const pct = fields.length ? covered / fields.length : 0;
+      return { id: name, x: cx + Math.cos(angle) * R, y: cy + Math.sin(angle) * R, covered, total: fields.length, pct };
+    });
+    const edges = graph.edges.map(e => ({ ...e, hits: fieldMap[`${e.from}.${e.field}`]?.hits || 0 }));
+    return { nodes, edges };
+  }, [graph, fieldMap]);
+
+  if (!graph) return <div className="panel" style={{ height: 580 }}>Загрузка схемы…</div>;
+  const nodeMap = Object.fromEntries(layout.nodes.map(n => [n.id, n]));
+
+  return (
+    <div className="panel" style={{ padding: 0, overflow: "hidden" }}>
+      <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h3 style={{ margin: 0, fontSize: 14 }}>🗺 Граф схемы</h3>
+        <Legend />
+      </div>
+      <div className="graph-container">
+        <svg className="graph-svg" viewBox="0 0 840 580" preserveAspectRatio="none">
+          {layout.edges.map((e, i) => {
+            const a = nodeMap[e.from], b = nodeMap[e.to];
+            if (!a || !b) return null;
+            const hits = e.hits;
+            return (
+              <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                stroke={hits > 0 ? "#22c55e" : "#334155"}
+                strokeWidth={hits > 0 ? Math.min(1 + Math.log2(hits + 1), 5) : 1}
+                opacity={hits > 0 ? 0.9 : 0.35} />
+            );
+          })}
+        </svg>
+        {layout.nodes.map(n => {
+          const cls = n.pct > 0.8 ? "covered" : n.pct > 0 ? "partial" : "miss";
+          const isSel = selected === n.id;
+          return (
+            <div key={n.id} className={`graph-node ${cls} ${isSel ? "selected" : ""}`}
+              style={{ left: `${(n.x / 840) * 100}%`, top: `${(n.y / 580) * 100}%`, width: 120, marginLeft: -60, marginTop: -28 }}
+              onClick={() => setSelected(n.id === selected ? null : n.id)}>
+              <div style={{ fontWeight: 700, color: "var(--cyan)" }}>{n.id}</div>
+              <div style={{ color: "var(--muted)", fontSize: 10, marginTop: 2 }}>
+                {n.covered}/{n.total} fields
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {selected && (
+        <div style={{ borderTop: "1px solid var(--border)", padding: 12, maxHeight: 180, overflow: "auto" }}>
+          <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>
+            Поля типа <b style={{ color: "var(--cyan)" }}>{selected}</b>:
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {Object.keys(graph.types[selected].fields).map(f => {
+              const row = fieldMap[`${selected}.${f}`];
+              const hits = row?.hits || 0;
+              return (
+                <button key={f} className="pill"
+                  onClick={() => onSelectField({ type: selected, field: f })}
+                  style={{ background: hits ? "rgba(34,197,94,.15)" : "rgba(239,68,68,.1)",
+                    color: hits ? "var(--green)" : "var(--red)", cursor: "pointer",
+                    border: hits ? "1px solid var(--green)" : "1px solid var(--red)" }}>
+                  {f} {hits ? `(${hits})` : ""}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---- Heatmap ----
+function Heatmap({ deltas, onSelectField, runId }) {
+  const [rows, setRows] = useState([]);
+  const [onlyMiss, setOnlyMiss] = useState(false);
+  const [search, setSearch] = useState("");
+  const [opFilter, setOpFilter] = useState("");
+  const [pulse, setPulse] = useState({});
+  const reqRef = useRef(0);
+
+  useEffect(() => {
+    const myReq = ++reqRef.current;
+    const params = new URLSearchParams();
+    if (onlyMiss) params.set("only_uncovered", "true");
+    if (search) params.set("q", search);
+    if (opFilter) params.set("operation", opFilter);
+    if (runId) params.set("run_id", String(runId));
+    api(`/api/coverage/fields?${params.toString()}`)
+      .then(data => { if (myReq === reqRef.current) setRows(data); })
+      .catch(() => {});
+  }, [onlyMiss, search, opFilter, deltas, runId]);
+
+  useEffect(() => {
+    if (Object.keys(deltas).length) {
+      const p = {}; Object.keys(deltas).forEach(k => p[k] = true);
+      setPulse(p); const t = setTimeout(() => setPulse({}), 1200);
+      return () => clearTimeout(t);
+    }
+  }, [deltas]);
+
+  const max = Math.max(1, ...rows.map(r => r.hits));
+
+  return (
+    <div className="panel" style={{ maxHeight: 620, overflow: "auto" }}>
+      <div style={{ marginBottom: 10 }}>
+        <h3 style={{ margin: "0 0 8px", fontSize: 14 }}>🔥 Heatmap полей</h3>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
+          <input type="text" placeholder="🔍 Поиск…" value={search}
+            onChange={e => setSearch(e.target.value)} style={{ flex: 1, minWidth: 120 }} />
+          <label style={{ fontSize: 12, color: "var(--muted)" }}>
+            <input type="checkbox" checked={onlyMiss} onChange={e => setOnlyMiss(e.target.checked)} />
+            {" "}только непокрытые
+          </label>
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button className={`filter-btn ${!opFilter ? "active" : ""}`} onClick={() => setOpFilter("")}>Все</button>
+          <button className={`filter-btn ${opFilter === "query" ? "active" : ""}`} onClick={() => setOpFilter("query")}>Query</button>
+          <button className={`filter-btn ${opFilter === "mutation" ? "active" : ""}`} onClick={() => setOpFilter("mutation")}>Mutation</button>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>Type</th><th>Field</th><th>→ Type</th><th>Hits</th><th>Heat</th></tr></thead>
+        <tbody>
+          {rows.map((r, i) => {
+            const key = `${r.type}.${r.field}`;
+            const heat = r.hits / max;
+            return (
+              <tr key={i} className={pulse[key] ? "pulse" : ""}
+                onClick={() => onSelectField({ type: r.type, field: r.field })}
+                style={{ cursor: "pointer" }}>
+                <td style={{ color: "var(--cyan)" }}>{r.type}</td>
+                <td style={{ color: r.covered ? "var(--text)" : "var(--red)" }}>{r.field}</td>
+                <td style={{ color: "var(--muted)" }}>{r.field_type}</td>
+                <td className={r.covered ? "field-hit" : "miss"}>{r.hits}</td>
+                <td><div className="heat-bar" style={{ background: `rgba(34,197,94,${0.08 + heat * 0.55})`,
+                  width: `${Math.max(6, heat * 100)}%` }} /></td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ---- Query Editor ----
+function QueryEditor({ onSent }) {
+  const [query, setQuery] = useState('{ users { id name email } }');
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const send = async () => {
+    setBusy(true); setResult(null);
+    try {
+      const r = await api("/api/send-query", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query }),
+      });
+      setResult(r);
+      if (r.ok) onSent && onSent();
+    } catch (e) { setResult({ ok: false, error: e.message }); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="panel">
+      <h3 style={{ margin: "0 0 10px", fontSize: 14 }}>🧪 Отправить GraphQL-запрос</h3>
+      <textarea rows={4} value={query} onChange={e => setQuery(e.target.value)}
+        style={{ width: "100%" }} placeholder="{ users { id name } }" />
+      <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <button className="btn" onClick={send} disabled={busy}>
+          {busy ? "Отправка…" : "▶ Отправить"}
+        </button>
+        <button className="btn ghost" onClick={() => setQuery('{ users { id name email } }')}>users</button>
+        <button className="btn ghost" onClick={() => setQuery('{ posts { title author { name } } }')}>posts</button>
+        <button className="btn ghost" onClick={() => setQuery('mutation { createUser(name: "Bob") { id name } }')}>mutation</button>
+      </div>
+      {result && (
+        <div style={{ marginTop: 10, fontSize: 12,
+          color: result.ok ? "var(--green)" : "var(--red)" }}>
+          {result.ok ? (
+            <div>✓ {result.analysis.operation_type} {result.analysis.operation_name || "anonymous"} · types: {result.analysis.types.join(", ")} · fields: {result.analysis.fields.length}</div>
+          ) : (<div>✕ {result.error}</div>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---- Hot fields ----
+function HotFields({ deltas, onSelectField, runId }) {
+  const [items, setItems] = useState([]);
+  useEffect(() => {
+    const rid = runId ? `&run_id=${runId}` : "";
+    api(`/api/coverage/hot?limit=10${rid}`).then(setItems).catch(() => {});
+  }, [deltas, runId]);
+  const max = Math.max(1, ...items.map(i => i.hits));
+  return (
+    <div className="panel">
+      <h3 style={{ margin: "0 0 10px", fontSize: 14 }}>🔥 Топ-10</h3>
+      {items.length === 0 && <div style={{ color: "var(--muted)", fontSize: 12 }}>Пока пусто</div>}
+      {items.map((it, i) => (
+        <div key={i} className="hot-item" onClick={() => onSelectField({ type: it.type, field: it.field })}
+             style={{ cursor: "pointer" }}>
+          <span className="hot-rank">{i + 1}</span>
+          <span style={{ color: "var(--cyan)", minWidth: 70 }}>{it.type}</span>
+          <span style={{ flex: 1, color: "var(--text)" }}>{it.field}</span>
+          <div className="hot-bar"><div className="hot-fill" style={{ width: `${(it.hits / max) * 100}%` }} /></div>
+          <span style={{ color: "var(--green)", fontWeight: 700, minWidth: 30, textAlign: "right" }}>{it.hits}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ---- History ----
+function History({ refreshKey, onSelect }) {
+  const [rows, setRows] = useState([]);
+  useEffect(() => { api("/api/history?limit=30").then(setRows).catch(() => {}); }, [refreshKey]);
+  return (
+    <div className="panel" style={{ maxHeight: 400, overflow: "auto" }}>
+      <h3 style={{ margin: "0 0 10px", fontSize: 14 }}>📋 История</h3>
+      <table>
+        <thead><tr><th>Тип</th><th>Операция</th><th>Статус</th><th>ms</th><th>Время</th></tr></thead>
+        <tbody>
+          {rows.map(r => (
+            <tr key={r.id} onClick={() => onSelect(r)} style={{ cursor: "pointer" }}>
+              <td style={{ color: "var(--violet)" }}>{r.type}</td>
+              <td>{r.operation || "anonymous"}</td>
+              <td style={{ color: r.status < 400 ? "var(--green)" : "var(--red)" }}>{r.status}</td>
+              <td style={{ color: "var(--muted)" }}>{r.duration_ms}</td>
+              <td style={{ color: "var(--muted)", fontSize: 11 }}>{new Date(r.created_at).toLocaleTimeString()}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ---- Timeline ----
+function Timeline({ refreshKey, onPickRun, activeRunId }) {
+  const [data, setData] = useState([]);
+  useEffect(() => { api("/api/timeline").then(setData).catch(() => {}); }, [refreshKey]);
+  const max = Math.max(1, ...data.map(d => d.coverage_pct));
+  return (
+    <div className="panel">
+      <h3 style={{ margin: "0 0 10px", fontSize: 14 }}>📈 Timeline прогонов</h3>
+      {data.length === 0 && <div style={{ color: "var(--muted)", fontSize: 12 }}>Прогонов пока нет</div>}
+      <div className="timeline-bar">
+        {data.map(d => (
+          <div key={d.run_id}
+            className={`timeline-bar-item ${d.run_id === activeRunId ? "active" : ""}`}
+            style={{ height: `${Math.max(4, (d.coverage_pct / max) * 80)}px` }}
+            title={`#${d.run_id} · ${d.coverage_pct}%`}
+            onClick={() => onPickRun(d.run_id)} />
+        ))}
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--muted)" }}>
+        <span>#{data[0]?.run_id || "—"}</span>
+        <span>#{data[data.length - 1]?.run_id || "—"}</span>
+      </div>
+    </div>
+  );
+}
+
+// ---- Drill Down ----
+function FieldDrillDown({ target, onClose }) {
+  const [data, setData] = useState(null);
+  useEffect(() => {
+    if (!target) return;
+    api(`/api/coverage/field/${encodeURIComponent(target.type)}/${encodeURIComponent(target.field)}/queries`)
+      .then(setData).catch(() => setData({ queries: [] }));
+  }, [target]);
+  if (!target) return null;
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+          <h3 style={{ margin: 0, fontSize: 15 }}>
+            <span style={{ color: "var(--cyan)" }}>{target.type}</span>.{target.field}
+          </h3>
+          <button className="btn ghost" onClick={onClose}>✕</button>
+        </div>
+        {!data && <div style={{ color: "var(--muted)" }}>Загрузка…</div>}
+        {data && data.queries.length === 0 && (
+          <div style={{ color: "var(--red)", fontSize: 13 }}>Запросов с этим полем нет.</div>
+        )}
+        {data && data.queries.map((q, i) => (
+          <div key={i} style={{ borderTop: "1px solid var(--border)", padding: "10px 0" }}>
+            <div style={{ fontSize: 12, color: "var(--cyan)", marginBottom: 4 }}>
+              {q.operation || "anonymous"} · {q.type} · test={q.test_id || "—"} · {q.status} · {q.duration_ms}ms
+            </div>
+            <pre style={{ fontSize: 11, color: "var(--muted)", whiteSpace: "pre-wrap", margin: 0 }}>{q.query}</pre>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---- Query Modal ----
+function QueryModal({ query, onClose }) {
+  if (!query) return null;
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+          <h3 style={{ margin: 0, fontSize: 15 }}>
+            <span style={{ color: "var(--violet)" }}>{query.type}</span> · {query.operation || "anonymous"}
+          </h3>
+          <button className="btn ghost" onClick={onClose}>✕</button>
+        </div>
+        <pre style={{ background: "var(--bg)", padding: 12, borderRadius: 8,
+          fontSize: 12, color: "var(--text)", whiteSpace: "pre-wrap" }}>{query.query}</pre>
+        <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 8 }}>
+          status={query.status} · {query.duration_ms}ms · {new Date(query.created_at).toLocaleString()}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- Run selector ----
+function RunSelector({ current, onChange, refreshKey }) {
+  const [runs, setRuns] = useState([]);
+  useEffect(() => { api("/api/runs").then(setRuns).catch(() => {}); }, [current, refreshKey]);
+  return (
+    <select value={current ?? ""} onChange={e => onChange(Number(e.target.value))}>
+      <option value="" disabled>Прогон…</option>
+      {runs.map(r => (
+        <option key={r.id} value={r.id}>#{r.id} · {r.coverage_pct}% · {r.run_key}</option>
+      ))}
+    </select>
+  );
+}
+
+// ---- Onboarding ----
+function Onboarding({ onClose, onDemo }) {
+  return (
+    <div className="onboarding">
+      <div style={{ fontWeight: 700, marginBottom: 6 }}>👋 Привет! Начни здесь:</div>
+      <div style={{ color: "var(--muted)", fontSize: 12, marginBottom: 10 }}>
+        Нажми «Прогнать демо» — увидишь, как граф оживает.
+      </div>
+      <button className="btn" onClick={onDemo}>▶ Прогнать демо</button>
+      <button className="btn ghost" onClick={onClose} style={{ marginLeft: 8 }}>Позже</button>
+    </div>
+  );
+}
+
+// ---- App ----
+function App() {
+  const [summary, setSummary] = useState(null);
+  const [graph, setGraph] = useState(null);
+  const [fieldMap, setFieldMap] = useState({});
+  const [deltas, setDeltas] = useState({});
+  const [target, setTarget] = useState(null);
+  const [queryModal, setQueryModal] = useState(null);
+  const [runId, setRunId] = useState(null);
+  const [wsStatus, setWsStatus] = useState("connecting");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const [theme, setTheme] = useState("dark");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [showOnboarding, setShowOnboarding] = useState(true);
+  const { toasts, add: addToast } = useToasts();
+  const reqIdRef = useRef(0);
+
+  useEffect(() => { document.documentElement.setAttribute("data-theme", theme); }, [theme]);
+
+  // Схема — один раз при старте
+  useEffect(() => {
+    api("/api/schema/graph").then(setGraph).catch(() => {});
+  }, []);
+
+  // Единая загрузка покрытия — с защитой от race condition
+  const loadCoverage = useCallback(async () => {
+    const myReq = ++reqIdRef.current;
+    try {
+      const rid = runId ? `?run_id=${runId}` : "";
+      const [s, fields] = await Promise.all([
+        api("/api/coverage/summary" + rid),
+        api("/api/coverage/fields" + rid),
+      ]);
+      if (myReq !== reqIdRef.current) return; // устарело — выходим
+      setSummary(s);
+      setErr(null);
+      const m = {};
+      fields.forEach(r => { m[`${r.type}.${r.field}`] = r; });
+      setFieldMap(m);
+      setRefreshKey(k => k + 1);
+      return s;
+    } catch (e) {
+      if (myReq === reqIdRef.current) setErr(e.message);
+    }
+  }, [runId]);
+
+  // Перезагружаем при смене прогона
+  useEffect(() => { loadCoverage(); }, [loadCoverage]);
+
+  // WebSocket (держим свежий loadCoverage в ref, чтобы не переподключаться при смене прогона)
+  const loadRef = useRef(null);
+  loadRef.current = loadCoverage;
+  useEffect(() => {
+    let ws, timer, closed = false;
+    const connect = () => {
+      const proto = location.protocol === "https:" ? "wss:" : "ws:";
+      ws = new WebSocket(`${proto}//${location.host}/api/ws/coverage`);
+      ws.onopen = () => setWsStatus("live");
+      ws.onclose = () => {
+        if (closed) return;
+        setWsStatus("offline");
+        timer = setTimeout(connect, 2000);
+      };
+      ws.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data);
+          if (msg.event === "coverage_delta") {
+            const d = {};
+            msg.payload.deltas.forEach(x => { if (x.kind === "field") d[`${x.type}.${x.field}`] = 1; });
+            setDeltas(d);
+            loadRef.current && loadRef.current();
+          }
+        } catch {}
+      };
+    };
+    connect();
+    const ping = setInterval(() => ws && ws.readyState === 1 && ws.send("ping"), 20000);
+    return () => { closed = true; clearTimeout(timer); clearInterval(ping); ws && ws.close(); };
+  }, []);
+
+  const runDemo = async () => {
+    setBusy(true); setShowOnboarding(false);
+    try {
+      const before = summary?.coverage_pct ?? 0;
+      const r = await fetch("/api/demo", { method: "POST" });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const s = await loadCoverage();
+      const after = s?.coverage_pct ?? before;
+      if (after > before) addToast(`Покрытие выросло: +${(after - before).toFixed(1)}%`);
+      else addToast("Демо отправлено");
+    } catch (e) { addToast(e.message, true); }
+    finally { setBusy(false); }
+  };
+
+  const newRun = async () => {
+    try {
+      const r = await api("/api/runs/new", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ run_key: `run-${Date.now()}` }),
+      });
+      // сброс визуального состояния перед переключением
+      setDeltas({});
+      setFieldMap({});
+      setSummary(null);
+      setRunId(r.run_id);
+      addToast(`Новый прогон #${r.run_id}`);
+    } catch (e) { addToast(e.message, true); }
+  };
+
+  const resetRun = async () => {
+    if (!summary?.run_id) return;
+    try {
+      await fetch(`/api/runs/${summary.run_id}/reset`, { method: "POST" });
+      addToast(`Прогон #${summary.run_id} сброшен`);
+      loadCoverage();
+    } catch (e) { addToast(e.message, true); }
+  };
+
+  const activateRun = async (id) => {
+    setDeltas({});
+    setFieldMap({});
+    setRunId(id);
+    try { await fetch(`/api/runs/${id}/activate`, { method: "POST" }); } catch {}
+  };
+
+  return (
+    <div style={{ padding: 20, minHeight: "100vh" }}>
+      <Toasts toasts={toasts} />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
+        <div>
+          <h1 className="god-title" style={{ margin: 0 }}>Сеть глазами Бога</h1>
+          <p style={{ color: "var(--muted)", fontSize: 12, margin: "4px 0 0" }}>
+            GraphQL Coverage Proxy · v4.0 {summary?.mock_mode && <span style={{ color: "var(--yellow)" }}>· MOCK</span>}
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <span className="pill" style={{ color: wsStatus === "live" ? "var(--green)" : "var(--red)" }}>● {wsStatus}</span>
+          <RunSelector current={runId ?? summary?.run_id ?? null} onChange={activateRun} refreshKey={refreshKey} />
+          <button className="btn ghost" onClick={newRun}>+ Прогон</button>
+          <button className="btn ghost" onClick={resetRun} title="Сбросить покрытие">↺ Сброс</button>
+          <a className="btn ghost" href={`/api/export?fmt=csv${runId ? `&run_id=${runId}` : ""}`} style={{ textDecoration: "none" }}>CSV</a>
+          <a className="btn ghost" href={`/api/export?fmt=json${runId ? `&run_id=${runId}` : ""}`} style={{ textDecoration: "none" }}>JSON</a>
+          <button className="btn ghost" onClick={() => setTheme(t => t === "dark" ? "light" : "dark")}>{theme === "dark" ? "☀" : "🌙"}</button>
+          <button className="btn" onClick={runDemo} disabled={busy}>{busy ? "Отправляю…" : "▶ Прогнать демо"}</button>
+        </div>
+      </div>
+
+      {err && <div className="panel" style={{ borderColor: "var(--red)", color: "var(--red)", marginBottom: 14, fontSize: 13 }}>Ошибка: {err}</div>}
+
+      {summary && (
+        <div style={{ display: "flex", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
+          <Card label="Coverage" value={`${summary.coverage_pct}%`} color="var(--green)" />
+          <Card label="Types" value={`${summary.types_covered}/${summary.types_total}`} color="var(--cyan)" />
+          <Card label="Fields" value={`${summary.fields_covered}/${summary.fields_total}`} color="var(--violet)" />
+          <Card label="Run" value={`#${summary.run_id}`} color="var(--yellow)" />
+          <Card label="Mode" value={summary.mock_mode ? "MOCK" : "PROXY"} color={summary.mock_mode ? "var(--yellow)" : "var(--green)"} />
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 14, marginBottom: 14 }}>
+        <SchemaGraph graph={graph} fieldMap={fieldMap} onSelectField={setTarget} />
+        <Heatmap deltas={deltas} onSelectField={setTarget} runId={runId} />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
+        <QueryEditor onSent={() => { addToast("Запрос выполнен"); loadCoverage(); }} />
+        <HotFields deltas={deltas} onSelectField={setTarget} runId={runId} />
+        <Timeline refreshKey={refreshKey} onPickRun={activateRun} activeRunId={summary?.run_id} />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 14 }}>
+        <History refreshKey={refreshKey} onSelect={setQueryModal} />
+        <div className="panel">
+          <h3 style={{ margin: "0 0 10px", fontSize: 14 }}>ℹ️ Как это работает</h3>
+          <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>
+            1. Прокси стоит между тестами и GraphQL API.<br/>
+            2. Каждый запрос парсится по схеме.<br/>
+            3. Считаются hits по типам и полям.<br/>
+            4. Результат виден в графе и heatmap.<br/>
+            5. Каждый прогон — отдельная история.
+          </div>
+        </div>
+      </div>
+
+      <footer style={{ marginTop: 14, textAlign: "center", color: "var(--muted)", fontSize: 11 }}>
+        god-eye v4.0 · MIT
+      </footer>
+
+      {target && <FieldDrillDown target={target} onClose={() => setTarget(null)} />}
+      {queryModal && <QueryModal query={queryModal} onClose={() => setQueryModal(null)} />}
+      {showOnboarding && <Onboarding onClose={() => setShowOnboarding(false)} onDemo={runDemo} />}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

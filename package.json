@@ -1,0 +1,34 @@
+{
+  "name": "graphql-coverage-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GraphQL Coverage Proxy — прозрачный прокси между тестами и GraphQL API со сбором и визуализацией покрытия схемы.",
+  "license": "MIT",
+  "type": "module",
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "seed": "node scripts/seed-demo.mjs",
+    "smoke": "node scripts/smoke.mjs",
+    "test": "node --test test/",
+    "test:inproc": "node --test --test-isolation=none \"test/*.test.js\"",
+    "check": "node --check src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.22.3",
+    "graphql": "^16.15.0"
+  },
+  "keywords": [
+    "graphql",
+    "coverage",
+    "proxy",
+    "testing",
+    "schema",
+    "voyager",
+    "render"
+  ]
+}

@@ -1,0 +1,14 @@
+node_modules
+npm-debug.log
+data
+backend
+.git
+.gitignore
+.github
+.tmp-*
+.shots
+docs/screenshots
+README.md
+*.log
+.env
+.env.*

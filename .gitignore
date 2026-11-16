@@ -1,0 +1,24 @@
+# зависимости
+node_modules/
+.npm-cache/
+
+# данные сервиса (схемы, прогоны, покрытие)
+data/
+.tmp-*/
+.tmp-data/
+.tmp-demo/
+.tmp-smoke/
+.tmp-tests/
+.shots/
+.tmp-chrome/
+
+# окружение и секреты
+.env
+.env.*
+!.env.example
+
+# служебное
+*.log
+coverage/
+.DS_Store
+Thumbs.db

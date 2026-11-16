@@ -1,0 +1,57 @@
+# Render Blueprint для GraphQL Coverage Proxy.
+# Документация: https://render.com/docs/blueprint-spec
+#
+# Как использовать:
+#   1. Запушьте репозиторий на GitHub.
+#   2. В Render: New → Blueprint → выберите репозиторий (Render найдёт render.yaml).
+#   3. Заполните TARGET_GRAPHQL_URL (или оставьте пустым и загрузите SDL из UI).
+#
+# ВАЖНО про данные на free-плане: диск эфемерный (/tmp), при рестарте данные
+# теряются. DEMO_MODE=true пересоздаёт демо-набор. Для продакшена подключите
+# persistent disk (платный план) и DATA_DIR=/var/data — блок внизу.
+
+services:
+  - type: web
+    name: graphql-coverage-proxy
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: main
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DEMO_MODE
+        value: "true"
+      - key: DATA_DIR
+        value: /tmp/gqlcov
+      - key: ALLOW_PRIVATE_TARGETS
+        value: "false"
+      - key: ALLOW_TARGET_OVERRIDE
+        value: "false"
+      # Заполняется вручную в дашборде Render (sync: false).
+      - key: TARGET_GRAPHQL_URL
+        sync: false
+      # Ключ для загрузки схем/ingest; Render сгенерирует значение один раз.
+      - key: ADMIN_TOKEN
+        generateValue: true
+      # Если сервис публичный, включите ключ прокси:
+      - key: PROXY_API_KEY
+        sync: false
+      - key: LOG_LEVEL
+        value: info
+
+# ---------------------------------------------------------------------------
+# Persistent disk (требует платного плана Render):
+#   1) раскомментируйте блок disks;
+#   2) замените DATA_DIR выше на /var/data.
+# ---------------------------------------------------------------------------
+#    disks:
+#      - name: gqlcov-data
+#        mountPath: /var/data
+#        sizeGB: 1

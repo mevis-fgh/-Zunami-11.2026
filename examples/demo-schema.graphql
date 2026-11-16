@@ -1,0 +1,287 @@
+"""
+Демо-схема интернет-магазина для GraphQL Coverage Proxy.
+Используется в DEMO_MODE и в примерах загрузки SDL.
+"""
+
+scalar DateTime
+scalar Decimal
+
+interface Node {
+  id: ID!
+}
+
+enum UserRole {
+  CUSTOMER
+  MANAGER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  BLOCKED
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum SearchType {
+  PRODUCT
+  USER
+  ORDER
+}
+
+enum SortDirection {
+  ASC
+  DESC
+}
+
+enum ProductSortField {
+  PRICE
+  RATING
+  CREATED_AT
+}
+
+input UserFilter {
+  search: String
+  role: UserRole
+  status: UserStatus
+}
+
+input ProductFilter {
+  search: String
+  category: String
+  minPrice: Decimal
+  maxPrice: Decimal
+  inStock: Boolean
+}
+
+input ProductSort {
+  field: ProductSortField!
+  direction: SortDirection!
+}
+
+input UpdateProfileInput {
+  name: String
+  email: String
+  phone: String
+  avatarUrl: String
+}
+
+input CreateOrderInput {
+  items: [OrderItemInput!]!
+  addressId: ID!
+  couponCode: String
+  notes: String
+}
+
+input OrderItemInput {
+  productId: ID!
+  quantity: Int!
+}
+
+input ReviewInput {
+  rating: Int!
+  text: String
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+type UserConnection {
+  edges: [UserEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type UserEdge {
+  node: User!
+  cursor: String!
+}
+
+type ProductConnection {
+  edges: [ProductEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type ProductEdge {
+  node: Product!
+  cursor: String!
+}
+
+type Query {
+  me: User
+  user(id: ID!): User
+  users(first: Int = 20, after: String, filter: UserFilter, sort: SortDirection): UserConnection!
+  product(id: ID!): Product
+  products(first: Int = 20, after: String, filter: ProductFilter, sort: ProductSort): ProductConnection!
+  category(slug: String!): Category
+  categories: [Category!]!
+  order(id: ID!): Order
+  orders(status: OrderStatus, first: Int = 20, from: DateTime, to: DateTime): [Order!]!
+  search(term: String!, types: [SearchType!] = [PRODUCT, USER]): [SearchResult!]!
+  metrics(from: DateTime!, to: DateTime!): Metrics!
+  node(id: ID!): Node
+}
+
+type Mutation {
+  login(email: String!, password: String!): AuthPayload!
+  updateProfile(input: UpdateProfileInput!): User!
+  addToCart(productId: ID!, quantity: Int = 1): Cart!
+  removeFromCart(productId: ID!): Cart!
+  createOrder(input: CreateOrderInput!): Order!
+  cancelOrder(id: ID!): Order!
+  addReview(productId: ID!, input: ReviewInput!): Review!
+}
+
+type Subscription {
+  orderUpdated(orderId: ID!): Order!
+  cartChanged: Cart!
+}
+
+type AuthPayload {
+  token: String!
+  refreshToken: String!
+  user: User!
+}
+
+type User implements Node {
+  id: ID!
+  email: String!
+  name: String!
+  role: UserRole!
+  status: UserStatus!
+  avatarUrl: String
+  createdAt: DateTime!
+  addresses: [Address!]!
+  orders(first: Int = 10, status: OrderStatus): [Order!]!
+  cart: Cart
+  reviews: [Review!]!
+  wishlist: [Product!]!
+}
+
+type Address {
+  id: ID!
+  label: String
+  city: String
+  street: String
+  zip: String
+  country: String
+  isDefault: Boolean!
+}
+
+type Product implements Node {
+  id: ID!
+  sku: String!
+  title: String!
+  slug: String!
+  description: String
+  price: Decimal!
+  compareAtPrice: Decimal
+  currency: String!
+  rating: Float
+  reviewCount: Int!
+  inStock: Boolean!
+  stock: Int!
+  category: Category
+  images: [ProductImage!]!
+  reviews(first: Int = 5, sort: SortDirection): [Review!]!
+  related(limit: Int = 4): [Product!]!
+  tags: [String!]!
+  createdAt: DateTime!
+}
+
+type ProductImage {
+  url: String!
+  alt: String
+  width: Int
+  height: Int
+}
+
+type Category {
+  id: ID!
+  slug: String!
+  name: String!
+  parent: Category
+  children: [Category!]!
+  products(first: Int): [Product!]!
+}
+
+type Review {
+  id: ID!
+  rating: Int!
+  text: String
+  author: User!
+  product: Product!
+  createdAt: DateTime!
+  helpfulCount: Int!
+}
+
+type Cart {
+  id: ID!
+  items: [CartItem!]!
+  subtotal: Decimal!
+  total: Decimal!
+  currency: String!
+  updatedAt: DateTime!
+}
+
+type CartItem {
+  id: ID!
+  product: Product!
+  quantity: Int!
+  price: Decimal!
+}
+
+type Order implements Node {
+  id: ID!
+  number: String!
+  status: OrderStatus!
+  items: [OrderItem!]!
+  subtotal: Decimal!
+  shipping: Decimal!
+  discount: Decimal!
+  total: Decimal!
+  currency: String!
+  customer: User!
+  shippingAddress: Address!
+  createdAt: DateTime!
+  paidAt: DateTime
+  shippedAt: DateTime
+  trackingNumber: String
+}
+
+type OrderItem {
+  id: ID!
+  product: Product!
+  title: String!
+  quantity: Int!
+  price: Decimal!
+  total: Decimal!
+}
+
+type Metrics {
+  orders: Int!
+  revenue: Decimal!
+  averageOrderValue: Decimal!
+  newUsers: Int!
+  conversionRate: Float!
+  topProducts: [Product!]!
+}
+
+union SearchResult = Product | User | Order
+
+type SearchHit {
+  score: Float!
+  result: SearchResult!
+}
