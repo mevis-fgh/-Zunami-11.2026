@@ -19,6 +19,6 @@ data/
 
 # служебное
 *.log
-coverage/
+/coverage/
 .DS_Store
 Thumbs.db
